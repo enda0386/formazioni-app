@@ -523,6 +523,10 @@ tr.row-in-scadenza td{background:rgba(245,158,11,.04)}
     </button>
   </nav>
   <div class="sidebar-bottom">
+    <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:6px;color:var(--text3)" onclick="doLogout()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Esci
+    </button>
     <button class="btn btn-secondary btn-sm" style="width:100%" onclick="exportExcel()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Esporta Excel
@@ -1078,10 +1082,72 @@ tr.row-in-scadenza td{background:rgba(245,158,11,.04)}
 
 <script>
 // ── CONFIG ─────────────────────────────────────────────────────────────────
-// Cambia questo URL con il tuo URL Render dopo il deploy
-//const API = localStorage.getItem('api_url') || 'http://localhost:8000';
+const API = localStorage.getItem('api_url') || 'http://localhost:8000';
 
-const API = 'https://formazioni-backend.onrender.com';
+// ── AUTENTICAZIONE JWT ────────────────────────────────────────────────────
+// Le credenziali vivono nelle variabili d'ambiente di Render (APP_USERNAME, APP_PASSWORD).
+// Nessuna password nel codice sorgente.
+const TOKEN_KEY = 'fm_jwt';
+
+function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
+
+function isLoggedIn() {
+  const token = getToken();
+  if (!token) return false;
+  try {
+    // Legge la payload del JWT (base64) senza librerie esterne
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    // exp è in secondi Unix
+    if (Date.now() / 1000 > payload.exp) {
+      localStorage.removeItem(TOKEN_KEY);
+      return false;
+    }
+    return true;
+  } catch { return false; }
+}
+
+async function doLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const err  = document.getElementById('login-error');
+  const btn  = document.getElementById('login-btn');
+
+  if (!user || !pass) { err.textContent = 'Inserisci username e password.'; err.style.display = 'block'; return; }
+
+  btn.textContent = 'Accesso in corso…';
+  btn.disabled = true;
+
+  try {
+    const r = await fetch(API + '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass }),
+    });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      throw new Error(data.detail || 'Credenziali non corrette');
+    }
+    const data = await r.json();
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('login-user').value = '';
+    document.getElementById('login-pass').value = '';
+    err.style.display = 'none';
+    init();
+  } catch (e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+    document.getElementById('login-pass').value = '';
+  } finally {
+    btn.textContent = 'Accedi';
+    btn.disabled = false;
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem(TOKEN_KEY);
+  location.reload();
+}
 
 // ── STATE ──────────────────────────────────────────────────────────────────
 let currentPage = 'dashboard';
@@ -1120,10 +1186,15 @@ function goTo(page) {
 // ── API HELPER ─────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
   try {
-    const r = await fetch(API + path, {
-      headers: { 'Content-Type': 'application/json' },
-      ...opts,
-    });
+    const headers = { 'Content-Type': 'application/json' };
+    const token = getToken();
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const r = await fetch(API + path, { headers, ...opts });
+    if (r.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      location.reload();  // token scaduto → torna al login
+      return;
+    }
     if (!r.ok) {
       const err = await r.json().catch(() => ({}));
       throw new Error(err.detail || `Errore ${r.status}`);
@@ -1667,6 +1738,11 @@ async function checkApi() {
 
 // ── INIT ───────────────────────────────────────────────────────────────────
 async function init() {
+  if (!isLoggedIn()) {
+    document.getElementById('login-screen').style.display = 'flex';
+    setTimeout(() => document.getElementById('login-user').focus(), 100);
+    return;
+  }
   await checkApi();
   await loadCantieri();
   await loadTipiFormazione();
