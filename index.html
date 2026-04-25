@@ -1,0 +1,2181 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestione Formazioni</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── CHECKLIST CANTIERE TEMP ─────────────────────────── */
+.checklist-wrap{overflow-x:auto}
+.checklist-table{border-collapse:collapse;min-width:100%}
+.checklist-table th,.checklist-table td{
+  border:1px solid var(--border);
+  padding:8px 10px;
+  font-size:12px;
+  white-space:nowrap;
+}
+.checklist-table thead th{
+  background:var(--surface2);
+  font-size:10px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.06em;
+  color:var(--text3);
+  position:sticky;top:0;z-index:2;
+}
+.checklist-table .th-corso{
+  max-width:140px;overflow:hidden;
+  text-overflow:ellipsis;
+  font-size:10px;
+}
+.checklist-table .td-dip{
+  position:sticky;left:0;z-index:1;
+  background:var(--surface);
+  font-weight:500;color:var(--text);
+  border-right:2px solid var(--border2);
+  min-width:160px;
+}
+.cell-valido{background:var(--green-bg);color:var(--green);text-align:center;font-size:11px;font-weight:500}
+.cell-in_scadenza{background:var(--amber-bg);color:var(--amber);text-align:center;font-size:11px;font-weight:500}
+.cell-scaduto{background:var(--red-bg);color:var(--red);text-align:center;font-size:11px;font-weight:500}
+.cell-assente{background:var(--surface2);color:var(--text3);text-align:center;font-size:11px}
+.cell-special{background:rgba(167,139,250,.08);color:var(--purple);text-align:center;font-size:11px;font-weight:500}
+.corso-selector{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.corso-chip{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 10px;border-radius:99px;
+  border:1px solid var(--border);
+  background:var(--surface2);
+  font-size:12px;color:var(--text2);
+  cursor:pointer;transition:all .15s;user-select:none;
+}
+.corso-chip:hover{border-color:var(--accent);color:var(--accent)}
+.corso-chip.selected{background:rgba(79,142,247,.12);border-color:var(--accent);color:var(--accent);font-weight:500}
+.corso-chip input{display:none}
+.ct-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);padding:16px 18px;
+  cursor:pointer;transition:border-color .15s;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.ct-card:hover{border-color:var(--border2)}
+.ct-card.active-ct{border-color:var(--accent);background:rgba(79,142,247,.05)}
+.ct-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:20px}
+
+/* ── RESET & BASE ─────────────────────────────────────────── */ ─────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;
+  --surface:#181c27;
+  --surface2:#1e2333;
+  --border:#2a3048;
+  --border2:#3a4460;
+  --text:#e8eaf0;
+  --text2:#8b92a8;
+  --text3:#545d78;
+  --accent:#4f8ef7;
+  --accent2:#2563eb;
+  --green:#22c55e;
+  --green-bg:#0d2a1a;
+  --amber:#f59e0b;
+  --amber-bg:#2a1e08;
+  --red:#ef4444;
+  --red-bg:#2a0d0d;
+  --purple:#a78bfa;
+  --radius:10px;
+  --radius-lg:16px;
+  --shadow:0 4px 24px rgba(0,0,0,.4);
+  --font:'DM Sans',sans-serif;
+  --mono:'DM Mono',monospace;
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  font-size:14px;
+  line-height:1.6;
+}
+
+/* ── LAYOUT ───────────────────────────────────────────────── */
+.app{display:flex;min-height:100vh}
+
+/* sidebar */
+.sidebar{
+  width:220px;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  position:fixed;
+  top:0;left:0;bottom:0;
+  z-index:100;
+  transition:transform .25s ease;
+}
+.sidebar-logo{
+  padding:24px 20px 16px;
+  border-bottom:1px solid var(--border);
+}
+.sidebar-logo h1{
+  font-size:15px;
+  font-weight:600;
+  color:var(--text);
+  letter-spacing:-.3px;
+  line-height:1.3;
+}
+.sidebar-logo span{
+  font-size:11px;
+  color:var(--text3);
+  font-weight:400;
+}
+.nav{flex:1;padding:12px 8px;overflow-y:auto}
+.nav-section{
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--text3);
+  padding:12px 12px 6px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;
+  border-radius:8px;
+  cursor:pointer;
+  color:var(--text2);
+  font-size:13.5px;
+  font-weight:400;
+  transition:background .15s,color .15s;
+  margin-bottom:2px;
+  border:none;background:none;width:100%;text-align:left;
+}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:rgba(79,142,247,.12);color:var(--accent);font-weight:500}
+.nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:.7}
+.nav-item.active svg{opacity:1}
+.sidebar-bottom{
+  padding:12px 8px;
+  border-top:1px solid var(--border);
+}
+
+/* main */
+.main{
+  margin-left:220px;
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  min-height:100vh;
+}
+.topbar{
+  height:52px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;
+  position:sticky;top:0;z-index:50;
+}
+.topbar-title{font-size:15px;font-weight:500;color:var(--text)}
+.topbar-actions{display:flex;gap:8px;align-items:center}
+.content{padding:24px;flex:1}
+
+/* ── COMPONENTS ───────────────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:7px 14px;
+  border-radius:8px;
+  font-family:var(--font);
+  font-size:13px;
+  font-weight:500;
+  cursor:pointer;
+  border:none;
+  transition:all .15s;
+  white-space:nowrap;
+}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#3d7de8}
+.btn-secondary{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+.btn-secondary:hover{color:var(--text);border-color:var(--border2)}
+.btn-danger{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.btn-danger:hover{background:rgba(239,68,68,.2)}
+.btn-ghost{background:none;color:var(--text2);padding:7px 10px}
+.btn-ghost:hover{color:var(--text);background:var(--surface2)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn svg{width:14px;height:14px}
+
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:20px;
+}
+
+/* stat cards */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:18px 20px;
+  position:relative;
+  overflow:hidden;
+}
+.stat-card::before{
+  content:'';
+  position:absolute;top:0;left:0;right:0;height:3px;
+  border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+}
+.stat-card.blue::before{background:var(--accent)}
+.stat-card.green::before{background:var(--green)}
+.stat-card.amber::before{background:var(--amber)}
+.stat-card.red::before{background:var(--red)}
+.stat-label{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.stat-value{font-size:28px;font-weight:600;line-height:1;letter-spacing:-1px}
+.stat-card.blue .stat-value{color:var(--accent)}
+.stat-card.green .stat-value{color:var(--green)}
+.stat-card.amber .stat-value{color:var(--amber)}
+.stat-card.red .stat-value{color:var(--red)}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:4px}
+
+/* badges */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 8px;
+  border-radius:99px;
+  font-size:11px;
+  font-weight:500;
+  font-family:var(--mono);
+}
+.badge-green{background:var(--green-bg);color:var(--green)}
+.badge-amber{background:var(--amber-bg);color:var(--amber)}
+.badge-red{background:var(--red-bg);color:var(--red)}
+.badge-gray{background:var(--surface2);color:var(--text3)}
+.badge-purple{background:rgba(167,139,250,.1);color:var(--purple)}
+.badge-blue{background:rgba(79,142,247,.1);color:var(--accent)}
+
+/* table */
+.table-wrap{overflow-x:auto;border-radius:var(--radius-lg);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse}
+thead{background:var(--surface2)}
+th{
+  padding:10px 14px;
+  text-align:left;
+  font-size:11px;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:var(--text3);
+  white-space:nowrap;
+  border-bottom:1px solid var(--border);
+}
+td{
+  padding:10px 14px;
+  border-bottom:1px solid var(--border);
+  font-size:13px;
+  color:var(--text2);
+  vertical-align:middle;
+}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.td-name{color:var(--text);font-weight:500}
+
+/* filters bar */
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.search-box{
+  position:relative;flex:1;min-width:200px;max-width:320px;
+}
+.search-box input{
+  width:100%;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:8px 12px 8px 34px;
+  color:var(--text);
+  font-family:var(--font);
+  font-size:13px;
+}
+.search-box input::placeholder{color:var(--text3)}
+.search-box input:focus{outline:none;border-color:var(--accent)}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3)}
+select{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:8px 28px 8px 12px;
+  color:var(--text2);
+  font-family:var(--font);
+  font-size:13px;
+  cursor:pointer;
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b92a8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 10px center;
+}
+select:focus{outline:none;border-color:var(--accent)}
+
+/* modal */
+.overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.7);
+  z-index:200;
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  opacity:0;pointer-events:none;
+  transition:opacity .2s;
+}
+.overlay.open{opacity:1;pointer-events:all}
+.modal{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  width:100%;max-width:520px;
+  max-height:90vh;
+  overflow-y:auto;
+  transform:translateY(12px);
+  transition:transform .2s;
+  box-shadow:var(--shadow);
+}
+.overlay.open .modal{transform:translateY(0)}
+.modal-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 20px;
+  border-bottom:1px solid var(--border);
+}
+.modal-header h3{font-size:15px;font-weight:600}
+.modal-body{padding:20px}
+.modal-footer{
+  padding:14px 20px;
+  border-top:1px solid var(--border);
+  display:flex;justify-content:flex-end;gap:8px;
+}
+
+/* form */
+.form-grid{display:grid;gap:14px}
+.form-grid-2{grid-template-columns:1fr 1fr}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group label{font-size:12px;font-weight:500;color:var(--text2)}
+.form-group input,
+.form-group select,
+.form-group textarea{
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:8px 12px;
+  color:var(--text);
+  font-family:var(--font);
+  font-size:13px;
+  transition:border-color .15s;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus{
+  outline:none;
+  border-color:var(--accent);
+}
+.form-group textarea{resize:vertical;min-height:72px}
+.form-hint{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* section header */
+.section-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:16px;
+}
+.section-title{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.section-sub{font-size:12px;color:var(--text3);margin-top:2px}
+
+/* tabs */
+.tabs{display:flex;gap:2px;background:var(--surface2);border-radius:10px;padding:3px;margin-bottom:20px}
+.tab{
+  flex:1;padding:7px 14px;
+  border-radius:8px;
+  border:none;background:none;
+  font-family:var(--font);font-size:13px;font-weight:500;
+  color:var(--text3);cursor:pointer;
+  transition:all .15s;
+  text-align:center;
+}
+.tab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+
+/* empty state */
+.empty{
+  text-align:center;padding:48px 24px;
+  color:var(--text3);
+}
+.empty svg{width:40px;height:40px;margin:0 auto 12px;opacity:.4}
+.empty p{font-size:14px}
+
+/* toast */
+.toast-wrap{position:fixed;bottom:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:8px}
+.toast{
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:12px 16px;
+  font-size:13px;
+  box-shadow:var(--shadow);
+  animation:slide-in .2s ease;
+  display:flex;align-items:center;gap:8px;
+}
+.toast.success{border-left:3px solid var(--green)}
+.toast.error{border-left:3px solid var(--red)}
+@keyframes slide-in{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* cantiere badge */
+.cant-badge{
+  font-size:11px;font-family:var(--mono);
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:2px 7px;
+  color:var(--text3);
+  white-space:nowrap;
+}
+
+/* spinner */
+.spinner{
+  width:18px;height:18px;
+  border:2px solid var(--border);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:spin .7s linear infinite;
+  display:inline-block;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.loading-row td{text-align:center;padding:32px;color:var(--text3)}
+
+/* page visibility */
+.page{display:none}
+.page.active{display:block}
+
+/* responsive */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}
+  .form-grid-2{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:1fr 1fr}
+}
+
+/* scadenza coloring on rows */
+tr.row-scaduto td{background:rgba(239,68,68,.04)}
+tr.row-in-scadenza td{background:rgba(245,158,11,.04)}
+
+/* ── PRINT / PDF ─────────────────────────────────────────── */
+@media print {
+  .sidebar, .topbar, .btn, .filters, .section-header button,
+  #ct-corso-chips, .card > div:first-child button { display: none !important; }
+  .main { margin-left: 0 !important; }
+  body { background: #fff !important; color: #000 !important; }
+  .ct-card, .card { border: 1px solid #ccc !important; }
+  .checklist-table td, .checklist-table th { border: 1px solid #ccc !important; }
+}
+
+</style>
+</head>
+<body>
+
+<div class="app">
+<!-- ── SIDEBAR ──────────────────────────────────────────────── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <h1>Formazioni &amp;<br>Visite Mediche</h1>
+    <span>Gestione sicurezza</span>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">Principale</div>
+    <button class="nav-item active" onclick="goTo('dashboard')" data-page="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-item" onclick="goTo('scadenze')" data-page="scadenze">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      Scadenze
+    </button>
+    <div class="nav-section">Anagrafica</div>
+    <button class="nav-item" onclick="goTo('dipendenti')" data-page="dipendenti">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.87"/></svg>
+      Dipendenti
+    </button>
+    <button class="nav-item" onclick="goTo('cantieri')" data-page="cantieri">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Cantieri
+    </button>
+    <div class="nav-section">Formazioni</div>
+    <button class="nav-item" onclick="goTo('attestati')" data-page="attestati">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+      Attestati
+    </button>
+    <button class="nav-item" onclick="goTo('visite')" data-page="visite">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Visite Mediche
+    </button>
+    <button class="nav-item" onclick="goTo('corsi')" data-page="corsi">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+      Catalogo Corsi
+    </button>
+    <div class="nav-section">Pianificazione</div>
+    <button class="nav-item" onclick="goTo('cantieri-temp')" data-page="cantieri-temp">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Cantieri Temporanei
+    </button>
+  </nav>
+  <div class="sidebar-bottom">
+    <button class="btn btn-secondary btn-sm" style="width:100%" onclick="exportExcel()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Esporta Excel
+    </button>
+  </div>
+</aside>
+
+<!-- ── MAIN ─────────────────────────────────────────────────── -->
+<main class="main">
+  <header class="topbar">
+    <span class="topbar-title" id="topbar-title">Dashboard</span>
+    <div class="topbar-actions">
+      <span id="api-status" class="badge badge-gray">Connessione…</span>
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- PAGE: DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card blue"><div class="stat-label">Dipendenti attivi</div><div class="stat-value" id="s-dip">—</div></div>
+        <div class="stat-card red"><div class="stat-label">Attestati scaduti</div><div class="stat-value" id="s-scad">—</div></div>
+        <div class="stat-card amber"><div class="stat-label">In scadenza 60gg</div><div class="stat-value" id="s-inscad">—</div></div>
+        <div class="stat-card red"><div class="stat-label">Visite scadute</div><div class="stat-value" id="s-vscad">—</div></div>
+        <div class="stat-card amber"><div class="stat-label">Visite in scadenza</div><div class="stat-value" id="s-vinscad">—</div></div>
+      </div>
+      <div class="section-header" style="margin-top:8px">
+        <div><div class="section-title">Riepilogo per cantiere</div></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Cantiere / Sede</th>
+            <th>Dipendenti</th>
+            <th>Att. scaduti</th>
+            <th>Att. in scadenza</th>
+            <th>Visite scadute</th>
+            <th>Visite in scadenza</th>
+          </tr></thead>
+          <tbody id="dash-table"><tr class="loading-row"><td colspan="6"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PAGE: SCADENZE -->
+    <div class="page" id="page-scadenze">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Scadenze imminenti</div>
+          <div class="section-sub" id="scad-count">—</div>
+        </div>
+        <div class="filters" style="margin:0">
+          <select id="scad-giorni" onchange="loadScadenze()">
+            <option value="30">Entro 30 giorni</option>
+            <option value="60">Entro 60 giorni</option>
+            <option value="90" selected>Entro 90 giorni</option>
+            <option value="180">Entro 180 giorni</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Cantiere</th><th>Dipendente</th><th>Corso / Formazione</th>
+            <th>Esecuzione</th><th>Scadenza</th><th>Giorni</th><th>Stato</th>
+          </tr></thead>
+          <tbody id="scad-table"><tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PAGE: DIPENDENTI -->
+    <div class="page" id="page-dipendenti">
+      <div class="section-header">
+        <div><div class="section-title">Dipendenti</div></div>
+        <button class="btn btn-primary" onclick="openModal('modal-dip')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nuovo dipendente
+        </button>
+      </div>
+      <div class="filters">
+        <div class="search-box">
+          <span class="search-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+          <input type="text" placeholder="Cerca dipendente…" id="dip-cerca" oninput="loadDipendenti()">
+        </div>
+        <select id="dip-cantiere" onchange="loadDipendenti()">
+          <option value="">Tutti i cantieri</option>
+        </select>
+        <select id="dip-attivo" onchange="loadDipendenti()">
+          <option value="">Tutti</option>
+          <option value="1" selected>Attivi</option>
+          <option value="0">Non attivi</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Nominativo</th><th>Cantiere</th><th>Agenzia</th><th>Stato</th><th style="width:100px">Azioni</th>
+          </tr></thead>
+          <tbody id="dip-table"><tr class="loading-row"><td colspan="5"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PAGE: CANTIERI -->
+    <div class="page" id="page-cantieri">
+      <div class="section-header">
+        <div><div class="section-title">Cantieri / Sedi</div></div>
+        <button class="btn btn-primary" onclick="openModal('modal-cant')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nuovo cantiere
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nome</th><th>Descrizione</th><th>Stato</th><th style="width:100px">Azioni</th></tr></thead>
+          <tbody id="cant-table"><tr class="loading-row"><td colspan="4"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PAGE: ATTESTATI -->
+    <div class="page" id="page-attestati">
+      <div class="section-header">
+        <div><div class="section-title">Attestati formativi</div></div>
+        <button class="btn btn-primary" onclick="openModal('modal-att')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nuovo attestato
+        </button>
+      </div>
+      <div class="filters">
+        <div class="search-box">
+          <span class="search-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+          <input type="text" placeholder="Cerca…" id="att-cerca" oninput="filterAttestati()">
+        </div>
+        <select id="att-cantiere" onchange="loadAttestati()">
+          <option value="">Tutti i cantieri</option>
+        </select>
+        <select id="att-stato" onchange="loadAttestati()">
+          <option value="">Tutti gli stati</option>
+          <option value="valido">Valido</option>
+          <option value="in_scadenza">In scadenza</option>
+          <option value="scaduto">Scaduto</option>
+          <option value="nis">NIS</option>
+          <option value="iaa">IAA</option>
+          <option value="iac">IAC</option>
+        </select>
+        <select id="att-categoria" onchange="loadAttestati()">
+          <option value="">Tutte le categorie</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Dipendente</th><th>Cantiere</th><th>Corso</th><th>Categoria</th>
+            <th>Esecuzione</th><th>Scadenza</th><th>Stato</th><th style="width:80px">Azioni</th>
+          </tr></thead>
+          <tbody id="att-table"><tr class="loading-row"><td colspan="8"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PAGE: VISITE -->
+    <div class="page" id="page-visite">
+      <div class="section-header">
+        <div><div class="section-title">Visite Mediche</div></div>
+        <button class="btn btn-primary" onclick="openModal('modal-vis')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nuova visita
+        </button>
+      </div>
+      <div class="filters">
+        <select id="vis-cantiere" onchange="loadVisite()">
+          <option value="">Tutti i cantieri</option>
+        </select>
+        <select id="vis-esito" onchange="loadVisite()">
+          <option value="">Tutti gli esiti</option>
+          <option value="idoneo">Idoneo</option>
+          <option value="idoneo_limitazioni">Idoneo con limitazioni</option>
+          <option value="non_idoneo">Non idoneo</option>
+          <option value="in_attesa">In attesa</option>
+        </select>
+        <select id="vis-scad" onchange="loadVisite()">
+          <option value="">Tutte</option>
+          <option value="90">In scadenza 90gg</option>
+          <option value="60">In scadenza 60gg</option>
+          <option value="30">In scadenza 30gg</option>
+          <option value="-1">Solo scadute</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Dipendente</th><th>Cantiere</th><th>Tipo</th><th>Durata</th>
+            <th>Data visita</th><th>Scadenza</th><th>Giorni</th><th>Esito</th><th style="width:80px">Azioni</th>
+          </tr></thead>
+          <tbody id="vis-table"><tr class="loading-row"><td colspan="9"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PAGE: CORSI -->
+    <div class="page" id="page-corsi">
+      <div class="section-header">
+        <div><div class="section-title">Catalogo Corsi</div></div>
+        <button class="btn btn-primary" onclick="openModal('modal-corso')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nuovo corso
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Codice</th><th>Nome corso</th><th>Riferimento normativo</th>
+            <th>Ore</th><th>Periodicità</th><th>Categoria</th>
+          </tr></thead>
+          <tbody id="corsi-table"><tr class="loading-row"><td colspan="6"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PAGE: CANTIERI TEMPORANEI -->
+    <div class="page" id="page-cantieri-temp">
+      <div id="ct-list-view">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Cantieri Temporanei</div>
+            <div class="section-sub">Pianificazione squadre per cantieri a tempo determinato</div>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('modal-ct')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nuovo cantiere
+          </button>
+        </div>
+        <div class="ct-grid" id="ct-cards"></div>
+      </div>
+
+      <!-- DETTAGLIO CANTIERE TEMP -->
+      <div id="ct-detail-view" style="display:none">
+        <div class="section-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn btn-ghost btn-sm" onclick="backToCTList()">← Indietro</button>
+            <div>
+              <div class="section-title" id="ct-detail-title">—</div>
+              <div class="section-sub" id="ct-detail-sub">—</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary" onclick="openAddDipToCT()">+ Dipendente</button>
+            <button class="btn btn-primary" onclick="refreshChecklist()">Aggiorna checklist</button>
+            <button class="btn btn-secondary" onclick="exportChecklistPDF()" id="btn-export-pdf" style="display:none">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+              Esporta PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- Selezione corsi richiesti -->
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <span style="font-size:13px;font-weight:500">Corsi richiesti per questo cantiere</span>
+            <button class="btn btn-secondary btn-sm" onclick="saveCorsiRichiesti()">Salva selezione</button>
+          </div>
+          <div class="corso-selector" id="ct-corso-chips"></div>
+        </div>
+
+        <!-- Checklist matrix -->
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:13px;font-weight:500">Checklist attestati</span>
+            <div style="display:flex;gap:8px;font-size:11px;align-items:center">
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--green-bg);border:1px solid var(--green);display:inline-block"></span>Valido</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--amber-bg);border:1px solid var(--amber);display:inline-block"></span>In scadenza</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--red-bg);border:1px solid var(--red);display:inline-block"></span>Scaduto</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--surface2);border:1px solid var(--border);display:inline-block"></span>Assente</span>
+            </div>
+          </div>
+          <div class="checklist-wrap">
+            <div id="checklist-matrix">
+              <div style="text-align:center;padding:32px;color:var(--text3)">Seleziona i corsi richiesti e clicca "Aggiorna checklist"</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dipendenti assegnati -->
+        <div style="margin-top:16px">
+          <div class="section-header">
+            <div class="section-title" style="font-size:14px">Dipendenti assegnati</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Nominativo</th><th>Sede</th><th>Agenzia</th><th>Ingresso</th><th>Note</th><th style="width:80px">Azioni</th></tr></thead>
+              <tbody id="ct-dip-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+</div><!-- /app -->
+
+<!-- ══ MODALS ═══════════════════════════════════════════════ -->
+
+<!-- Modal: Cantiere -->
+<div class="overlay" id="modal-cant" onclick="closeOnBg(event,'modal-cant')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="cant-modal-title">Nuovo cantiere</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-cant')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Nome *</label><input id="cant-nome" type="text" placeholder="es. Massafra"></div>
+        <div class="form-group"><label>Descrizione</label><input id="cant-desc" type="text" placeholder="Note opzionali"></div>
+        <div class="form-group">
+          <label>Stato</label>
+          <select id="cant-attivo"><option value="1">Attivo</option><option value="0">Non attivo</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-cant')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveCantiere()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Dipendente -->
+<div class="overlay" id="modal-dip" onclick="closeOnBg(event,'modal-dip')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="dip-modal-title">Nuovo dipendente</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-dip')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-grid form-grid-2">
+          <div class="form-group"><label>Cognome *</label><input id="dip-cognome" type="text" placeholder="ROSSI"></div>
+          <div class="form-group"><label>Nome *</label><input id="dip-nome" type="text" placeholder="MARIO"></div>
+        </div>
+        <div class="form-group"><label>Cantiere / Sede *</label><select id="dip-cantiere-sel"></select></div>
+        <div class="form-group"><label>Agenzia interinale</label><input id="dip-agenzia" type="text" placeholder="es. Manpower (lascia vuoto se assunto diretto)"></div>
+        <div class="form-group"><label>Data assunzione</label><input id="dip-data" type="date"></div>
+        <div class="form-group">
+          <label>Stato</label>
+          <select id="dip-attivo-sel"><option value="1">Attivo</option><option value="0">Non attivo</option></select>
+        </div>
+        <div class="form-group"><label>Note</label><textarea id="dip-note" placeholder="Informazioni aggiuntive…"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-dip')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveDipendente()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Attestato -->
+<div class="overlay" id="modal-att" onclick="closeOnBg(event,'modal-att')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="att-modal-title">Nuovo attestato</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-att')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Dipendente *</label><select id="att-dip-sel"></select></div>
+        <div class="form-group">
+          <label>Tipo corso *</label>
+          <select id="att-tipo-sel" onchange="updateAttScadInfo()"></select>
+          <div class="form-hint" id="att-tipo-hint"></div>
+        </div>
+        <div class="form-group">
+          <label>Data esecuzione *</label>
+          <input id="att-data" type="date" oninput="updateAttScadInfo()">
+          <div class="form-hint" id="att-scad-preview"></div>
+        </div>
+        <div class="form-group">
+          <label>Stato speciale</label>
+          <select id="att-stato-sel">
+            <option value="valido">Valido (calcola da data)</option>
+            <option value="nis">NIS — Nessuna idoneità sanitaria</option>
+            <option value="iaa">IAA — In attesa attestato</option>
+            <option value="iac">IAC — In attesa controllo</option>
+            <option value="nd">ND — Non disponibile</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Ente formatore</label><input id="att-ente" type="text" placeholder="es. INAIL, Ente privato…"></div>
+        <div class="form-group"><label>Note</label><textarea id="att-note"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-att')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveAttestato()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Visita -->
+<div class="overlay" id="modal-vis" onclick="closeOnBg(event,'modal-vis')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="vis-modal-title">Nuova visita medica</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-vis')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Dipendente *</label><select id="vis-dip-sel"></select></div>
+        <div class="form-group">
+          <label>Tipo visita *</label>
+          <select id="vis-tipo-sel" onchange="onVisTipoChange()">
+            <option value="annuale">Annuale (12 mesi)</option>
+            <option value="semestrale">Semestrale (6 mesi)</option>
+            <option value="trimestrale">Trimestrale (3 mesi)</option>
+            <option value="biennale">Biennale (24 mesi)</option>
+            <option value="quinquennale">Quinquennale (60 mesi)</option>
+            <option value="straordinaria">Straordinaria (nessuna scadenza)</option>
+            <option value="personalizzata">Personalizzata (inserisci mesi)</option>
+          </select>
+        </div>
+        <div class="form-group" id="vis-durata-group" style="display:none">
+          <label>Durata in mesi *</label>
+          <input id="vis-durata" type="number" min="1" max="120" placeholder="es. 3">
+          <div class="form-hint">Inserisci il numero di mesi indicato dal medico competente</div>
+        </div>
+        <div class="form-group">
+          <label>Data visita *</label>
+          <input id="vis-data" type="date" oninput="updateVisScadPreview()">
+          <div class="form-hint" id="vis-scad-preview"></div>
+        </div>
+        <div class="form-group">
+          <label>Esito *</label>
+          <select id="vis-esito-sel">
+            <option value="idoneo">Idoneo</option>
+            <option value="idoneo_limitazioni">Idoneo con limitazioni</option>
+            <option value="non_idoneo">Non idoneo</option>
+            <option value="in_attesa">In attesa</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Medico competente</label><input id="vis-medico" type="text" placeholder="Dott. …"></div>
+        <div class="form-group"><label>Note / Prescrizioni</label><textarea id="vis-note" placeholder="Eventuali limitazioni o prescrizioni…"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-vis')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveVisita()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Corso -->
+<div class="overlay" id="modal-corso" onclick="closeOnBg(event,'modal-corso')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Nuovo tipo di corso</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-corso')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-grid form-grid-2">
+          <div class="form-group"><label>Codice *</label><input id="corso-codice" type="text" placeholder="es. FORM_ART37" style="text-transform:uppercase"></div>
+          <div class="form-group">
+            <label>Categoria *</label>
+            <select id="corso-cat">
+              <option value="formazione">Formazione</option>
+              <option value="dpi">DPI</option>
+              <option value="attrezzatura">Attrezzatura</option>
+              <option value="antincendio">Antincendio</option>
+              <option value="pronto_soccorso">Primo Soccorso</option>
+              <option value="gas">Gas/Sostanze</option>
+              <option value="elettrico">Elettrico/ATEX</option>
+              <option value="quota">Lavori in Quota</option>
+              <option value="visita">Visita Medica</option>
+              <option value="altro">Altro</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>Nome corso *</label><input id="corso-nome" type="text"></div>
+        <div class="form-group"><label>Riferimento normativo</label><input id="corso-rif" type="text" placeholder="es. Art.37 D.Lgs 81/08"></div>
+        <div class="form-grid form-grid-2">
+          <div class="form-group"><label>Durata (ore)</label><input id="corso-ore" type="number" min="1" placeholder="es. 8"></div>
+          <div class="form-group">
+            <label>Periodicità (anni)</label>
+            <input id="corso-period" type="number" min="1" max="10" placeholder="Lascia vuoto se non prevista">
+          </div>
+        </div>
+        <div class="form-group"><label>Note</label><textarea id="corso-note"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-corso')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveCorso()">Salva</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modal: Cantiere Temporaneo -->
+<div class="overlay" id="modal-ct" onclick="closeOnBg(event,'modal-ct')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="ct-modal-title">Nuovo cantiere temporaneo</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-ct')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Nome cantiere *</label><input id="ct-nome" type="text" placeholder="es. Fermata Major Mantova"></div>
+        <div class="form-group"><label>Cliente / Committente</label><input id="ct-cliente" type="text" placeholder="es. ENI Versalis"></div>
+        <div class="form-grid form-grid-2">
+          <div class="form-group"><label>Data inizio</label><input id="ct-dinizio" type="date"></div>
+          <div class="form-group"><label>Data fine prevista</label><input id="ct-dfine" type="date"></div>
+        </div>
+        <div class="form-group"><label>Descrizione / Note</label><textarea id="ct-desc" placeholder="Attività previste, luogo, riferimenti…"></textarea></div>
+        <div class="form-group">
+          <label>Stato</label>
+          <select id="ct-attivo-sel"><option value="1">Attivo</option><option value="0">Chiuso</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-ct')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveCT()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Aggiungi dipendente al cantiere temporaneo -->
+<div class="overlay" id="modal-ct-dip" onclick="closeOnBg(event,'modal-ct-dip')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Aggiungi dipendente al cantiere</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-ct-dip')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Dipendente *</label><select id="ct-add-dip-sel"></select></div>
+        <div class="form-group"><label>Data ingresso cantiere</label><input id="ct-add-ingresso" type="date"></div>
+        <div class="form-group"><label>Note</label><textarea id="ct-add-note" placeholder="Ruolo, mansione specifica…" style="min-height:56px"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-ct-dip')">Annulla</button>
+      <button class="btn btn-primary" onclick="saveAddDipToCT()">Aggiungi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+// ── CONFIG ─────────────────────────────────────────────────────────────────
+// Cambia questo URL con il tuo URL Render dopo il deploy
+//const API = localStorage.getItem('api_url') || 'http://localhost:8000';
+
+const API = 'https://formazioni-backend.onrender.com';
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let currentPage = 'dashboard';
+let editingId = null;
+let allAttestati = [];
+let cantieri = [];
+let tipiFormazione = [];
+let dipendenti = [];
+
+// ── ROUTING ────────────────────────────────────────────────────────────────
+function goTo(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelector(`[data-page="${page}"]`).classList.add('active');
+  const titles = {
+    dashboard:'Dashboard', scadenze:'Scadenze imminenti',
+    dipendenti:'Dipendenti', cantieri:'Cantieri / Sedi', 'cantieri-temp':'Cantieri Temporanei',
+    attestati:'Attestati formativi', visite:'Visite mediche', corsi:'Catalogo corsi'
+  };
+  document.getElementById('topbar-title').textContent = titles[page] || page;
+  currentPage = page;
+  const loaders = {
+    dashboard: loadDashboard,
+    scadenze: loadScadenze,
+    dipendenti: loadDipendenti,
+    cantieri: loadCantieri,
+    attestati: loadAttestati,
+    visite: loadVisite,
+    corsi: loadCorsi,
+    'cantieri-temp': loadCantierTemp,
+  };
+  if (loaders[page]) loaders[page]();
+}
+
+// ── API HELPER ─────────────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  try {
+    const r = await fetch(API + path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...opts,
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `Errore ${r.status}`);
+    }
+    if (r.status === 204) return null;
+    return r.json();
+  } catch (e) {
+    if (e.name === 'TypeError') throw new Error('Server non raggiungibile');
+    throw e;
+  }
+}
+
+// ── HELPERS ─────────────────────────────────────────────────────────────────
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function daysBadge(gg) {
+  if (gg === null || gg === undefined) return '<span class="badge badge-gray">—</span>';
+  if (gg < 0) return `<span class="badge badge-red">${Math.abs(gg)}gg fa</span>`;
+  if (gg <= 30) return `<span class="badge badge-red">${gg}gg</span>`;
+  if (gg <= 60) return `<span class="badge badge-amber">${gg}gg</span>`;
+  return `<span class="badge badge-gray">${gg}gg</span>`;
+}
+
+function statoBadge(stato) {
+  const map = {
+    valido:        ['badge-green', 'Valido'],
+    in_scadenza:   ['badge-amber', 'In scadenza'],
+    scaduto:       ['badge-red', 'Scaduto'],
+    nis:           ['badge-purple', 'NIS'],
+    iaa:           ['badge-purple', 'IAA'],
+    iac:           ['badge-purple', 'IAC'],
+    nd:            ['badge-gray', 'ND'],
+    idoneo:        ['badge-green', 'Idoneo'],
+    idoneo_limitazioni: ['badge-amber', 'Con limitazioni'],
+    non_idoneo:    ['badge-red', 'Non idoneo'],
+    in_attesa:     ['badge-gray', 'In attesa'],
+  };
+  const [cls, label] = map[stato] || ['badge-gray', stato];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function rowClass(gg) {
+  if (gg === null || gg === undefined) return '';
+  if (gg < 0) return 'row-scaduto';
+  if (gg <= 60) return 'row-in-scadenza';
+  return '';
+}
+
+function numBadge(n, cls = '') {
+  if (!n) return '<span style="color:var(--text3)">0</span>';
+  return `<span class="badge ${cls}">${n}</span>`;
+}
+
+// ── TOAST ──────────────────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ── MODALS ─────────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  editingId = null;
+}
+function closeOnBg(e, id) { if (e.target === e.currentTarget) closeModal(id); }
+
+// ── COMMON SELECTS ─────────────────────────────────────────────────────────
+async function loadCantieri() {
+  cantieri = await api('/cantieri/');
+  const tbody = document.getElementById('cant-table');
+  if (!cantieri.length) { tbody.innerHTML = emptyRow(4, 'Nessun cantiere'); return; }
+  tbody.innerHTML = cantieri.map(c => `
+    <tr>
+      <td class="td-name">${c.nome}</td>
+      <td style="color:var(--text3)">${c.descrizione || '—'}</td>
+      <td>${statoBadge(c.attivo ? 'valido' : 'nd')}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick="editCantiere(${c.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCantiere(${c.id})">🗑</button>
+        </div>
+      </td>
+    </tr>`).join('');
+  // populate selects
+  ['dip-cantiere', 'att-cantiere', 'vis-cantiere', 'dip-cantiere-sel'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const isFilter = !id.endsWith('-sel');
+    el.innerHTML = (isFilter ? '<option value="">Tutti i cantieri</option>' : '') +
+      cantieri.filter(c => c.attivo).map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+  });
+}
+
+function emptyRow(cols, msg = 'Nessun dato') {
+  return `<tr><td colspan="${cols}" style="text-align:center;padding:32px;color:var(--text3)">${msg}</td></tr>`;
+}
+
+async function loadDipSelectAll() {
+  dipendenti = await api('/dipendenti/?attivo=1');
+  const opts = dipendenti.map(d => `<option value="${d.id}">${d.cognome} ${d.nome} — ${d.cantiere}</option>`).join('');
+  ['att-dip-sel', 'vis-dip-sel'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<option value="">Seleziona dipendente…</option>' + opts;
+  });
+}
+
+async function loadTipiFormazione() {
+  tipiFormazione = await api('/tipi-formazione/');
+  const cats = [...new Set(tipiFormazione.map(t => t.categoria))].sort();
+  document.getElementById('att-categoria').innerHTML =
+    '<option value="">Tutte le categorie</option>' +
+    cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  document.getElementById('att-tipo-sel').innerHTML =
+    '<option value="">Seleziona corso…</option>' +
+    tipiFormazione.map(t => `<option value="${t.id}" data-anni="${t.periodicita_anni || ''}">${t.nome} ${t.periodicita_anni ? `(${t.periodicita_anni}y)` : '(nessuna scadenza)'}</option>`).join('');
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const d = await api('/dashboard/riepilogo');
+    document.getElementById('s-dip').textContent = d.totale_dipendenti_attivi;
+    document.getElementById('s-scad').textContent = d.attestati_scaduti;
+    document.getElementById('s-inscad').textContent = d.attestati_in_scadenza_60gg;
+    document.getElementById('s-vscad').textContent = d.visite_scadute;
+    document.getElementById('s-vinscad').textContent = d.visite_in_scadenza_60gg;
+    document.getElementById('dash-table').innerHTML = d.per_cantiere.map(c => `
+      <tr>
+        <td class="td-name">${c.cantiere}</td>
+        <td style="text-align:center">${c.tot_dipendenti}</td>
+        <td style="text-align:center">${numBadge(c.attestati_scaduti, 'badge-red')}</td>
+        <td style="text-align:center">${numBadge(c.attestati_in_scadenza_60gg, 'badge-amber')}</td>
+        <td style="text-align:center">${numBadge(c.visite_scadute, 'badge-red')}</td>
+        <td style="text-align:center">${numBadge(c.visite_in_scadenza_60gg, 'badge-amber')}</td>
+      </tr>`).join('');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── SCADENZE ────────────────────────────────────────────────────────────────
+async function loadScadenze() {
+  const gg = document.getElementById('scad-giorni').value;
+  document.getElementById('scad-table').innerHTML = `<tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>`;
+  try {
+    const rows = await api(`/attestati/scadenze?giorni=${gg}`);
+    document.getElementById('scad-count').textContent = `${rows.length} attestati trovati`;
+    document.getElementById('scad-table').innerHTML = rows.length
+      ? rows.map(r => `
+        <tr class="${rowClass(r.giorni_alla_scadenza)}">
+          <td><span class="cant-badge">${r.cantiere}</span></td>
+          <td class="td-name">${r.dipendente}</td>
+          <td>${r.corso}</td>
+          <td>${fmtDate(r.data_esecuzione)}</td>
+          <td>${fmtDate(r.data_scadenza)}</td>
+          <td>${daysBadge(r.giorni_alla_scadenza)}</td>
+          <td>${statoBadge(r.stato)}</td>
+        </tr>`).join('')
+      : emptyRow(7, 'Nessuna scadenza in questo intervallo');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── DIPENDENTI ─────────────────────────────────────────────────────────────
+async function loadDipendenti() {
+  const cerca = document.getElementById('dip-cerca').value;
+  const cant = document.getElementById('dip-cantiere').value;
+  const att = document.getElementById('dip-attivo').value;
+  let qs = '?';
+  if (cant) qs += `cantiere_id=${cant}&`;
+  if (att !== '') qs += `attivo=${att}&`;
+  if (cerca) qs += `cerca=${encodeURIComponent(cerca)}&`;
+  const tbody = document.getElementById('dip-table');
+  tbody.innerHTML = `<tr class="loading-row"><td colspan="5"><span class="spinner"></span></td></tr>`;
+  try {
+    const rows = await api('/dipendenti/' + qs);
+    tbody.innerHTML = rows.length ? rows.map(d => `
+      <tr>
+        <td class="td-name">${d.cognome} ${d.nome}</td>
+        <td><span class="cant-badge">${d.cantiere}</span></td>
+        <td style="color:var(--text3)">${d.agenzia || '—'}</td>
+        <td>${d.attivo ? '<span class="badge badge-green">Attivo</span>' : '<span class="badge badge-gray">Non attivo</span>'}</td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" onclick="editDipendente(${d.id})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteDipendente(${d.id})">🗑</button>
+          </div>
+        </td>
+      </tr>`).join('') : emptyRow(5, 'Nessun dipendente trovato');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── ATTESTATI ──────────────────────────────────────────────────────────────
+async function loadAttestati() {
+  const cant = document.getElementById('att-cantiere').value;
+  const stato = document.getElementById('att-stato').value;
+  const cat = document.getElementById('att-categoria').value;
+  let qs = '?';
+  if (cant) qs += `cantiere_id=${cant}&`;
+  if (stato) qs += `stato=${stato}&`;
+  if (cat) qs += `categoria=${cat}&`;
+  const tbody = document.getElementById('att-table');
+  tbody.innerHTML = `<tr class="loading-row"><td colspan="8"><span class="spinner"></span></td></tr>`;
+  try {
+    allAttestati = await api('/attestati/' + qs);
+    renderAttestati();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function renderAttestati() {
+  const cerca = document.getElementById('att-cerca').value.toLowerCase();
+  const rows = allAttestati.filter(r =>
+    !cerca || r.dipendente.toLowerCase().includes(cerca) || r.corso.toLowerCase().includes(cerca)
+  );
+  document.getElementById('att-table').innerHTML = rows.length ? rows.map(r => `
+    <tr class="${rowClass(r.giorni_alla_scadenza)}">
+      <td class="td-name">${r.dipendente}</td>
+      <td><span class="cant-badge">${r.cantiere}</span></td>
+      <td>${r.corso}</td>
+      <td><span class="badge badge-blue">${r.categoria}</span></td>
+      <td>${fmtDate(r.data_esecuzione)}</td>
+      <td>${fmtDate(r.data_scadenza)}</td>
+      <td>${statoBadge(r.stato)}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick="editAttestato(${r.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteAttestato(${r.id})">🗑</button>
+        </div>
+      </td>
+    </tr>`).join('') : emptyRow(8, 'Nessun attestato trovato');
+}
+
+function filterAttestati() { renderAttestati(); }
+
+function updateAttScadInfo() {
+  const sel = document.getElementById('att-tipo-sel');
+  const anni = sel.options[sel.selectedIndex]?.dataset.anni;
+  const data = document.getElementById('att-data').value;
+  const hint = document.getElementById('att-tipo-hint');
+  const preview = document.getElementById('att-scad-preview');
+  hint.textContent = anni ? `Periodicità: ${anni} anni` : 'Nessuna scadenza prevista';
+  if (anni && data) {
+    const exp = new Date(data);
+    exp.setFullYear(exp.getFullYear() + parseInt(anni));
+    preview.textContent = `Scadenza calcolata: ${fmtDate(exp.toISOString().split('T')[0])}`;
+  } else {
+    preview.textContent = '';
+  }
+}
+
+// ── VISITE ─────────────────────────────────────────────────────────────────
+async function loadVisite() {
+  const cant = document.getElementById('vis-cantiere').value;
+  const esito = document.getElementById('vis-esito').value;
+  const scad = document.getElementById('vis-scad').value;
+  let qs = '?';
+  if (cant) qs += `cantiere_id=${cant}&`;
+  if (esito) qs += `esito=${esito}&`;
+  if (scad && scad !== '-1') qs += `scadenza_entro_giorni=${scad}&`;
+  const tbody = document.getElementById('vis-table');
+  tbody.innerHTML = `<tr class="loading-row"><td colspan="9"><span class="spinner"></span></td></tr>`;
+  try {
+    let rows = await api('/visite/' + qs);
+    if (scad === '-1') rows = rows.filter(r => r.giorni_alla_scadenza !== null && r.giorni_alla_scadenza < 0);
+    tbody.innerHTML = rows.length ? rows.map(r => `
+      <tr class="${rowClass(r.giorni_alla_scadenza)}">
+        <td class="td-name">${r.dipendente}</td>
+        <td><span class="cant-badge">${r.cantiere}</span></td>
+        <td>${r.tipo}</td>
+        <td style="color:var(--text3);font-family:var(--mono)">${r.durata_mesi ? r.durata_mesi + ' mesi' : '—'}</td>
+        <td>${fmtDate(r.data_visita)}</td>
+        <td>${fmtDate(r.data_scadenza)}</td>
+        <td>${daysBadge(r.giorni_alla_scadenza)}</td>
+        <td>${statoBadge(r.esito)}</td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" onclick="editVisita(${r.id})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteVisita(${r.id})">🗑</button>
+          </div>
+        </td>
+      </tr>`).join('') : emptyRow(9, 'Nessuna visita trovata');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function onVisTipoChange() {
+  const tipo = document.getElementById('vis-tipo-sel').value;
+  const group = document.getElementById('vis-durata-group');
+  group.style.display = tipo === 'personalizzata' ? 'flex' : 'none';
+  updateVisScadPreview();
+}
+
+function updateVisScadPreview() {
+  const tipo = document.getElementById('vis-tipo-sel').value;
+  const data = document.getElementById('vis-data').value;
+  const durata = parseInt(document.getElementById('vis-durata').value) || null;
+  const preview = document.getElementById('vis-scad-preview');
+  const defaults = {annuale:12, semestrale:6, trimestrale:3, biennale:24, quinquennale:60};
+  const mesi = tipo === 'personalizzata' ? durata : (defaults[tipo] || null);
+  if (mesi && data) {
+    const exp = new Date(data);
+    exp.setMonth(exp.getMonth() + mesi);
+    preview.textContent = `Scadenza calcolata: ${fmtDate(exp.toISOString().split('T')[0])} (${mesi} mesi)`;
+  } else {
+    preview.textContent = tipo === 'straordinaria' ? 'Nessuna scadenza automatica' : '';
+  }
+}
+
+// ── CORSI ──────────────────────────────────────────────────────────────────
+async function loadCorsi() {
+  const rows = await api('/tipi-formazione/');
+  const periodLabel = {1:'Annuale',2:'Biennale',3:'Triennale',5:'Quinquennale',null:'—'};
+  document.getElementById('corsi-table').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${r.codice}</td>
+      <td class="td-name">${r.nome}</td>
+      <td style="color:var(--text3);font-size:12px">${r.riferimento_normativo || '—'}</td>
+      <td style="text-align:center">${r.durata_ore || '—'}</td>
+      <td style="text-align:center">${periodLabel[r.periodicita_anni] || (r.periodicita_anni ? r.periodicita_anni+'y' : '—')}</td>
+      <td><span class="badge badge-blue">${r.categoria}</span></td>
+    </tr>`).join('') : emptyRow(6, 'Nessun corso');
+}
+
+// ── CRUD: CANTIERI ─────────────────────────────────────────────────────────
+async function editCantiere(id) {
+  const c = cantieri.find(x => x.id === id);
+  document.getElementById('cant-modal-title').textContent = 'Modifica cantiere';
+  document.getElementById('cant-nome').value = c.nome;
+  document.getElementById('cant-desc').value = c.descrizione || '';
+  document.getElementById('cant-attivo').value = c.attivo;
+  editingId = id;
+  openModal('modal-cant');
+}
+async function saveCantiere() {
+  const body = {
+    nome: document.getElementById('cant-nome').value.trim(),
+    descrizione: document.getElementById('cant-desc').value.trim() || null,
+    attivo: parseInt(document.getElementById('cant-attivo').value),
+  };
+  if (!body.nome) { toast('Nome obbligatorio', 'error'); return; }
+  try {
+    if (editingId) await api(`/cantieri/${editingId}`, { method:'PUT', body:JSON.stringify(body) });
+    else await api('/cantieri/', { method:'POST', body:JSON.stringify(body) });
+    closeModal('modal-cant');
+    toast('Cantiere salvato');
+    loadCantieri();
+  } catch(e) { toast(e.message, 'error'); }
+}
+async function deleteCantiere(id) {
+  if (!confirm('Eliminare questo cantiere?')) return;
+  try {
+    await api(`/cantieri/${id}`, { method:'DELETE' });
+    toast('Cantiere eliminato');
+    loadCantieri();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── CRUD: DIPENDENTI ───────────────────────────────────────────────────────
+async function editDipendente(id) {
+  const d = await api(`/dipendenti/${id}`);
+  document.getElementById('dip-modal-title').textContent = 'Modifica dipendente';
+  document.getElementById('dip-cognome').value = d.cognome;
+  document.getElementById('dip-nome').value = d.nome;
+  document.getElementById('dip-cantiere-sel').value = d.cantiere_id;
+  document.getElementById('dip-agenzia').value = d.agenzia || '';
+  document.getElementById('dip-data').value = d.data_assunzione || '';
+  document.getElementById('dip-attivo-sel').value = d.attivo;
+  document.getElementById('dip-note').value = d.note || '';
+  editingId = id;
+  openModal('modal-dip');
+}
+async function saveDipendente() {
+  const body = {
+    cognome: document.getElementById('dip-cognome').value.trim().toUpperCase(),
+    nome: document.getElementById('dip-nome').value.trim().toUpperCase(),
+    cantiere_id: parseInt(document.getElementById('dip-cantiere-sel').value),
+    agenzia: document.getElementById('dip-agenzia').value.trim() || null,
+    data_assunzione: document.getElementById('dip-data').value || null,
+    attivo: parseInt(document.getElementById('dip-attivo-sel').value),
+    note: document.getElementById('dip-note').value.trim() || null,
+  };
+  if (!body.cognome || !body.nome || !body.cantiere_id) { toast('Cognome, nome e cantiere obbligatori', 'error'); return; }
+  try {
+    if (editingId) await api(`/dipendenti/${editingId}`, { method:'PUT', body:JSON.stringify(body) });
+    else await api('/dipendenti/', { method:'POST', body:JSON.stringify(body) });
+    closeModal('modal-dip');
+    toast('Dipendente salvato');
+    loadDipendenti();
+    loadDipSelectAll();
+  } catch(e) { toast(e.message, 'error'); }
+}
+async function deleteDipendente(id) {
+  if (!confirm('Eliminare questo dipendente? Verranno eliminati anche tutti i suoi attestati e visite.')) return;
+  try {
+    await api(`/dipendenti/${id}`, { method:'DELETE' });
+    toast('Dipendente eliminato');
+    loadDipendenti();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── CRUD: ATTESTATI ────────────────────────────────────────────────────────
+async function editAttestato(id) {
+  const a = await api(`/attestati/${id}`);
+  document.getElementById('att-modal-title').textContent = 'Modifica attestato';
+  document.getElementById('att-dip-sel').value = a.dipendente_id;
+  document.getElementById('att-tipo-sel').value = a.tipo_formazione_id;
+  document.getElementById('att-data').value = a.data_esecuzione;
+  document.getElementById('att-stato-sel').value = a.stato;
+  document.getElementById('att-ente').value = a.ente_formatore || '';
+  document.getElementById('att-note').value = a.note || '';
+  editingId = id;
+  updateAttScadInfo();
+  openModal('modal-att');
+}
+async function saveAttestato() {
+  const body = {
+    dipendente_id: parseInt(document.getElementById('att-dip-sel').value),
+    tipo_formazione_id: parseInt(document.getElementById('att-tipo-sel').value),
+    data_esecuzione: document.getElementById('att-data').value,
+    stato: document.getElementById('att-stato-sel').value,
+    ente_formatore: document.getElementById('att-ente').value.trim() || null,
+    note: document.getElementById('att-note').value.trim() || null,
+  };
+  if (!body.dipendente_id || !body.tipo_formazione_id || !body.data_esecuzione) {
+    toast('Dipendente, corso e data obbligatori', 'error'); return;
+  }
+  try {
+    if (editingId) await api(`/attestati/${editingId}`, { method:'PUT', body:JSON.stringify(body) });
+    else await api('/attestati/', { method:'POST', body:JSON.stringify(body) });
+    closeModal('modal-att');
+    toast('Attestato salvato');
+    loadAttestati();
+  } catch(e) { toast(e.message, 'error'); }
+}
+async function deleteAttestato(id) {
+  if (!confirm('Eliminare questo attestato?')) return;
+  try {
+    await api(`/attestati/${id}`, { method:'DELETE' });
+    toast('Attestato eliminato');
+    loadAttestati();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── CRUD: VISITE ────────────────────────────────────────────────────────────
+async function editVisita(id) {
+  const v = await api(`/visite/${id}`);
+  document.getElementById('vis-modal-title').textContent = 'Modifica visita';
+  document.getElementById('vis-dip-sel').value = v.dipendente_id;
+  document.getElementById('vis-tipo-sel').value = v.tipo;
+  document.getElementById('vis-durata').value = v.durata_mesi || '';
+  document.getElementById('vis-data').value = v.data_visita;
+  document.getElementById('vis-esito-sel').value = v.esito;
+  document.getElementById('vis-medico').value = v.medico || '';
+  document.getElementById('vis-note').value = v.note || '';
+  editingId = id;
+  onVisTipoChange();
+  updateVisScadPreview();
+  openModal('modal-vis');
+}
+async function saveVisita() {
+  const tipo = document.getElementById('vis-tipo-sel').value;
+  const durata = parseInt(document.getElementById('vis-durata').value) || null;
+  const body = {
+    dipendente_id: parseInt(document.getElementById('vis-dip-sel').value),
+    data_visita: document.getElementById('vis-data').value,
+    tipo,
+    durata_mesi: durata,
+    esito: document.getElementById('vis-esito-sel').value,
+    medico: document.getElementById('vis-medico').value.trim() || null,
+    note: document.getElementById('vis-note').value.trim() || null,
+  };
+  if (!body.dipendente_id || !body.data_visita) { toast('Dipendente e data obbligatori', 'error'); return; }
+  if (tipo === 'personalizzata' && !durata) { toast('Inserisci la durata in mesi', 'error'); return; }
+  try {
+    if (editingId) await api(`/visite/${editingId}`, { method:'PUT', body:JSON.stringify(body) });
+    else await api('/visite/', { method:'POST', body:JSON.stringify(body) });
+    closeModal('modal-vis');
+    toast('Visita salvata');
+    loadVisite();
+  } catch(e) { toast(e.message, 'error'); }
+}
+async function deleteVisita(id) {
+  if (!confirm('Eliminare questa visita?')) return;
+  try {
+    await api(`/visite/${id}`, { method:'DELETE' });
+    toast('Visita eliminata');
+    loadVisite();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── CRUD: CORSI ────────────────────────────────────────────────────────────
+async function saveCorso() {
+  const body = {
+    codice: document.getElementById('corso-codice').value.trim().toUpperCase(),
+    nome: document.getElementById('corso-nome').value.trim(),
+    riferimento_normativo: document.getElementById('corso-rif').value.trim() || null,
+    durata_ore: parseInt(document.getElementById('corso-ore').value) || null,
+    periodicita_anni: parseInt(document.getElementById('corso-period').value) || null,
+    categoria: document.getElementById('corso-cat').value,
+    note: document.getElementById('corso-note').value.trim() || null,
+  };
+  if (!body.codice || !body.nome) { toast('Codice e nome obbligatori', 'error'); return; }
+  try {
+    await api('/tipi-formazione/', { method:'POST', body:JSON.stringify(body) });
+    closeModal('modal-corso');
+    toast('Corso aggiunto al catalogo');
+    loadCorsi();
+    loadTipiFormazione();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── EXPORT ─────────────────────────────────────────────────────────────────
+async function exportExcel() {
+  try {
+    const r = await fetch(API + '/dashboard/export/excel');
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `formazioni_${new Date().toISOString().slice(0,10)}.xlsx`;
+    a.click();
+    toast('Export completato');
+  } catch(e) { toast('Errore export: ' + e.message, 'error'); }
+}
+
+// ── API STATUS CHECK ────────────────────────────────────────────────────────
+async function checkApi() {
+  const el = document.getElementById('api-status');
+  try {
+    await api('/health');
+    el.textContent = 'Online';
+    el.className = 'badge badge-green';
+  } catch {
+    el.textContent = 'Offline';
+    el.className = 'badge badge-red';
+  }
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+async function init() {
+  await checkApi();
+  await loadCantieri();
+  await loadTipiFormazione();
+  await loadDipSelectAll();
+  loadDashboard();
+}
+
+// ── CANTIERI TEMPORANEI ─────────────────────────────────────────────────────
+let currentCT = null;
+let ctChecklist = null;
+
+// ── EXPORT PDF CHECKLIST ────────────────────────────────────────────────────
+async function exportChecklistPDF() {
+  if (!ctChecklist) { toast('Carica prima la checklist', 'error'); return; }
+  
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();   // 297mm landscape
+  const H = doc.internal.pageSize.getHeight();  // 210mm
+
+  const cant = ctChecklist.cantiere;
+  const corsi = ctChecklist.corsi_richiesti;
+  const dipendenti = ctChecklist.dipendenti;
+  const today = new Date().toLocaleDateString('it-IT');
+
+  // ── Colori ──────────────────────────────────────────────────────────────
+  const NAVY   = [31, 78, 121];
+  const BLUE   = [46, 117, 182];
+  const LBLUE  = [214, 228, 240];
+  const GREEN  = [34, 197, 94];
+  const LGREEN = [212, 237, 218];
+  const AMBER  = [245, 158, 11];
+  const LAMBER = [255, 243, 205];
+  const RED    = [239, 68, 68];
+  const LRED   = [255, 208, 208];
+  const GRAY   = [240, 240, 240];
+  const LGRAY  = [249, 249, 249];
+  const WHITE  = [255, 255, 255];
+  const PURPLE = [167, 139, 250];
+  const LPURP  = [237, 233, 254];
+
+  // ── Header ───────────────────────────────────────────────────────────────
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, W, 22, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('CHECKLIST ATTESTATI — CANTIERE TEMPORANEO', 10, 9);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${cant.nome.toUpperCase()}${cant.cliente ? '  |  ' + cant.cliente : ''}`, 10, 16);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8);
+  doc.text(`Generato il ${today}`, W - 10, 16, { align: 'right' });
+
+  // date range
+  let dateStr = '';
+  if (cant.data_inizio) dateStr += 'Inizio: ' + fmtDate(cant.data_inizio);
+  if (cant.data_fine) dateStr += '  Fine: ' + fmtDate(cant.data_fine);
+  if (dateStr) {
+    doc.setTextColor(...LBLUE); doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    doc.text(dateStr, W - 10, 9, { align: 'right' });
+  }
+
+  let y = 26;
+
+  // ── Legenda ───────────────────────────────────────────────────────────────
+  const legend = [
+    { label: 'Valido', bg: LGREEN, fg: [27, 107, 58] },
+    { label: 'In scadenza ≤60gg', bg: LAMBER, fg: [127, 96, 0] },
+    { label: 'Scaduto', bg: LRED, fg: [131, 60, 60] },
+    { label: 'Assente', bg: GRAY, fg: [80, 80, 80] },
+    { label: 'NIS / IAA / IAC', bg: LPURP, fg: [109, 40, 217] },
+  ];
+  let lx = 10;
+  doc.setFontSize(7);
+  legend.forEach(l => {
+    doc.setFillColor(...l.bg);
+    doc.rect(lx, y, 3, 3, 'F');
+    doc.setDrawColor(180, 180, 180);
+    doc.rect(lx, y, 3, 3, 'S');
+    doc.setTextColor(...l.fg);
+    doc.setFont('helvetica', 'bold');
+    doc.text(l.label, lx + 4.5, y + 2.3);
+    lx += doc.getTextWidth(l.label) + 10;
+  });
+  y += 7;
+
+  // ── Checklist matrix ──────────────────────────────────────────────────────
+  if (corsi.length === 0 || dipendenti.length === 0) {
+    doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(10);
+    doc.text('Nessun dato disponibile per la checklist.', W / 2, y + 10, { align: 'center' });
+  } else {
+    const CELL_STATO = {
+      valido:       { label: '✓', bg: LGREEN, fg: [27,107,58] },
+      in_scadenza:  { label: '⚠', bg: LAMBER, fg: [127,96,0] },
+      scaduto:      { label: '✗', bg: LRED,   fg: [131,60,60] },
+      assente:      { label: '—', bg: GRAY,   fg: [120,120,120] },
+      nis:          { label: 'NIS', bg: LPURP, fg: [109,40,217] },
+      iaa:          { label: 'IAA', bg: LPURP, fg: [109,40,217] },
+      iac:          { label: 'IAC', bg: LPURP, fg: [109,40,217] },
+      nd:           { label: 'ND',  bg: GRAY,  fg: [120,120,120] },
+    };
+
+    // Column widths: first col (nome) fixed, rest equal share
+    const nameColW = 52;
+    const availW = W - 20 - nameColW;
+    const colW = Math.min(availW / corsi.length, 30);
+    const rowH = 7;
+    const hdrH = 14; // header row height for rotated text
+
+    // Header row (corso names, rotated)
+    doc.setFillColor(...NAVY);
+    doc.rect(10, y, nameColW, hdrH, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(7);
+    doc.text('Dipendente / Sede', 10 + nameColW / 2, y + hdrH / 2 + 1, { align: 'center' });
+
+    corsi.forEach((corso, ci) => {
+      const cx = 10 + nameColW + ci * colW;
+      doc.setFillColor(...(ci % 2 === 0 ? NAVY : BLUE));
+      doc.rect(cx, y, colW, hdrH, 'F');
+      // rotate text
+      doc.setTextColor(255,255,255);
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(6);
+      const maxLen = 22;
+      const label = corso.nome.length > maxLen ? corso.nome.substring(0, maxLen) + '…' : corso.nome;
+      doc.text(label, cx + colW / 2, y + hdrH - 2, {
+        align: 'center', angle: 40, maxWidth: hdrH - 2
+      });
+    });
+    y += hdrH;
+
+    // Data rows
+    dipendenti.forEach((dip, ri) => {
+      const rowBg = ri % 2 === 0 ? WHITE : LGRAY;
+      // nome cell
+      doc.setFillColor(...rowBg);
+      doc.rect(10, y, nameColW, rowH, 'F');
+      doc.setDrawColor(210,210,210);
+      doc.rect(10, y, nameColW, rowH, 'S');
+      doc.setTextColor(30,30,30);
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(7);
+      const nomeFull = `${dip.cognome} ${dip.nome}`;
+      doc.text(nomeFull.length > 24 ? nomeFull.substring(0,24)+'…' : nomeFull, 12, y + 4);
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(6);
+      doc.setTextColor(120,120,120);
+      doc.text(dip.cantiere_sede || '', 12, y + 6.2);
+
+      // corso cells
+      const dipCorsi = dip.corsi_richiesti || [];
+      corsi.forEach((corso, ci) => {
+        const cx = 10 + nameColW + ci * colW;
+        const att = dipCorsi.includes(corso.id)
+          ? (dip.attestati[corso.id] || { stato: 'assente' })
+          : { stato: 'nd' };
+        const cell = CELL_STATO[att.stato] || CELL_STATO['assente'];
+        doc.setFillColor(...cell.bg);
+        doc.rect(cx, y, colW, rowH, 'F');
+        doc.setDrawColor(210,210,210);
+        doc.rect(cx, y, colW, rowH, 'S');
+        doc.setTextColor(...cell.fg);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(att.label && att.label.length > 2 ? 5.5 : 8);
+        doc.text(cell.label, cx + colW / 2, y + rowH / 2 + 1.5, { align: 'center' });
+
+        // tooltip-like: scadenza sotto
+        if (att.data_scadenza && att.stato !== 'assente') {
+          doc.setFont('helvetica','normal');
+          doc.setFontSize(4.5);
+          doc.setTextColor(80,80,80);
+          doc.text(fmtDate(att.data_scadenza), cx + colW / 2, y + rowH - 0.8, { align: 'center' });
+        }
+      });
+
+      y += rowH;
+
+      // Page break check
+      if (y > H - 25 && ri < dipendenti.length - 1) {
+        doc.addPage('a4', 'landscape');
+        y = 15;
+        doc.setFillColor(...NAVY);
+        doc.rect(0, 0, W, 10, 'F');
+        doc.setTextColor(255,255,255);
+        doc.setFont('helvetica','bold');
+        doc.setFontSize(9);
+        doc.text(`${cant.nome} — continua`, 10, 7);
+      }
+    });
+  }
+
+  y += 6;
+
+  // ── Dipendenti assegnati (mini tabella sotto) ─────────────────────────────
+  if (y < H - 40 && dipendenti.length > 0) {
+    doc.setFillColor(...BLUE);
+    doc.rect(10, y, W - 20, 6, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(8);
+    doc.text('DIPENDENTI ASSEGNATI', 13, y + 4);
+    y += 6;
+
+    const dCols = [
+      { label: 'Cognome e Nome', w: 55 },
+      { label: 'Sede di provenienza', w: 50 },
+      { label: 'Agenzia', w: 35 },
+      { label: 'Data ingresso', w: 30 },
+      { label: 'Note', w: W - 20 - 55 - 50 - 35 - 30 },
+    ];
+
+    // sub-header
+    let dx = 10;
+    dCols.forEach(col => {
+      doc.setFillColor(...LBLUE);
+      doc.rect(dx, y, col.w, 5, 'F');
+      doc.setDrawColor(180,180,180);
+      doc.rect(dx, y, col.w, 5, 'S');
+      doc.setTextColor(...NAVY);
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(6.5);
+      doc.text(col.label, dx + 1.5, y + 3.5);
+      dx += col.w;
+    });
+    y += 5;
+
+    dipendenti.forEach((dip, ri) => {
+      const rH = 5;
+      const bg = ri % 2 === 0 ? WHITE : LGRAY;
+      dx = 10;
+      const vals = [
+        `${dip.cognome} ${dip.nome}`,
+        dip.cantiere_sede || '—',
+        dip.agenzia || '—',
+        dip.data_ingresso ? fmtDate(dip.data_ingresso) : '—',
+        dip.note || '',
+      ];
+      dCols.forEach((col, ci) => {
+        doc.setFillColor(...bg);
+        doc.rect(dx, y, col.w, rH, 'F');
+        doc.setDrawColor(210,210,210);
+        doc.rect(dx, y, col.w, rH, 'S');
+        doc.setTextColor(30,30,30);
+        doc.setFont('helvetica', ci === 0 ? 'bold' : 'normal');
+        doc.setFontSize(6.5);
+        const v = String(vals[ci]);
+        doc.text(v.length > Math.floor(col.w / 2.2) ? v.substring(0, Math.floor(col.w / 2.2)) + '…' : v,
+          dx + 1.5, y + 3.5);
+        dx += col.w;
+      });
+      y += rH;
+    });
+  }
+
+  // ── Footer ────────────────────────────────────────────────────────────────
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFillColor(...LBLUE);
+    doc.rect(0, H - 8, W, 8, 'F');
+    doc.setTextColor(...NAVY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text(`Gestione Formazioni e Visite Mediche  —  Pag. ${i}/${pageCount}  —  ${today}`, W / 2, H - 3, { align: 'center' });
+  }
+
+  // ── Salva ─────────────────────────────────────────────────────────────────
+  const safeName = cant.nome.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+  doc.save(`Checklist_${safeName}_${new Date().toISOString().slice(0,10)}.pdf`);
+  toast('PDF generato e scaricato');
+}
+
+
+async function loadCantierTemp() {
+  const cards = document.getElementById('ct-cards');
+  cards.innerHTML = '<div style="color:var(--text3);padding:20px"><span class="spinner"></span></div>';
+  try {
+    const list = await api('/cantieri-temp/');
+    if (!list.length) {
+      cards.innerHTML = '<div style="color:var(--text3);padding:20px;grid-column:1/-1">Nessun cantiere temporaneo. Creane uno!</div>';
+      return;
+    }
+    cards.innerHTML = list.map(ct => `
+      <div class="ct-card ${currentCT && currentCT.id===ct.id?'active-ct':''}" onclick="openCT(${ct.id})">
+        <div>
+          <div style="font-weight:500;font-size:14px;margin-bottom:3px">${ct.nome}</div>
+          <div style="font-size:12px;color:var(--text3)">${ct.cliente||''} ${ct.data_inizio?'· '+fmtDate(ct.data_inizio):''}</div>
+          <div style="margin-top:6px">
+            <span class="badge ${ct.attivo?'badge-green':'badge-gray'}">${ct.attivo?'Attivo':'Chiuso'}</span>
+            <span class="badge badge-blue" style="margin-left:4px">${ct.n_dipendenti} dip.</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();editCT(${ct.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteCT(${ct.id})">🗑</button>
+        </div>
+      </div>`).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function openCT(id) {
+  currentCT = await api('/cantieri-temp/'+id);
+  document.getElementById('ct-list-view').style.display = 'none';
+  document.getElementById('ct-detail-view').style.display = 'block';
+  document.getElementById('ct-detail-title').textContent = currentCT.nome;
+  document.getElementById('ct-detail-sub').textContent =
+    [currentCT.cliente, currentCT.data_inizio?'Inizio: '+fmtDate(currentCT.data_inizio):''].filter(Boolean).join(' · ');
+  buildCorsoChips();
+  await loadCTDipendenti();
+  await refreshChecklist();
+}
+
+function backToCTList() {
+  currentCT = null;
+  document.getElementById('ct-list-view').style.display = 'block';
+  document.getElementById('ct-detail-view').style.display = 'none';
+  loadCantierTemp();
+}
+
+function buildCorsoChips() {
+  // Legge i corsi_richiesti dall'ultima checklist o vuoto
+  const selected = ctChecklist ? new Set(ctChecklist.corsi_richiesti.map(c=>c.id)) : new Set();
+  const chips = document.getElementById('ct-corso-chips');
+  chips.innerHTML = tipiFormazione.map(tf => `
+    <label class="corso-chip ${selected.has(tf.id)?'selected':''}" data-id="${tf.id}">
+      <input type="checkbox" value="${tf.id}" ${selected.has(tf.id)?'checked':''} onchange="toggleChip(this)">
+      ${tf.nome}
+      ${tf.periodicita_anni?`<span style="font-size:10px;opacity:.7">${tf.periodicita_anni}y</span>`:''}
+    </label>`).join('');
+}
+
+function toggleChip(input) {
+  const label = input.closest('.corso-chip');
+  label.classList.toggle('selected', input.checked);
+}
+
+async function saveCorsiRichiesti() {
+  const ids = [...document.querySelectorAll('#ct-corso-chips input:checked')].map(i=>parseInt(i.value));
+  try {
+    await api(`/cantieri-temp/${currentCT.id}/corsi-richiesti`, {
+      method:'PUT', body:JSON.stringify({tipo_formazione_ids:ids})
+    });
+    toast('Corsi aggiornati');
+    await refreshChecklist();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function refreshChecklist() {
+  if (!currentCT) return;
+  const matrix = document.getElementById('checklist-matrix');
+  matrix.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3)"><span class="spinner"></span></div>';
+  try {
+    ctChecklist = await api('/cantieri-temp/'+currentCT.id+'/checklist');
+    buildChecklist(ctChecklist);
+    buildCorsoChips();
+    // Show export button only if there's data
+    const btn = document.getElementById('btn-export-pdf');
+    if (btn) {
+      btn.style.display = (ctChecklist.dipendenti.length > 0 && ctChecklist.corsi_richiesti.length > 0)
+        ? 'inline-flex' : 'none';
+    }
+  } catch(e) { toast(e.message,'error'); }
+}
+
+function buildChecklist(data) {
+  const matrix = document.getElementById('checklist-matrix');
+  if (!data.dipendenti.length) {
+    matrix.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text3)">Nessun dipendente assegnato.</div>';
+    return;
+  }
+  if (!data.corsi_richiesti.length) {
+    matrix.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text3)">Seleziona i corsi richiesti sopra e clicca "Salva selezione".</div>';
+    return;
+  }
+
+  const cellLabel = {
+    valido:'OK', in_scadenza:'⚠', scaduto:'✗', assente:'—',
+    nis:'NIS', iaa:'IAA', iac:'IAC', nd:'ND'
+  };
+  const cellClass = {
+    valido:'cell-valido', in_scadenza:'cell-in_scadenza', scaduto:'cell-scaduto',
+    assente:'cell-assente', nis:'cell-special', iaa:'cell-special', iac:'cell-special', nd:'cell-assente'
+  };
+
+  let html = '<table class="checklist-table"><thead><tr>';
+  html += '<th style="min-width:160px;position:sticky;left:0;background:var(--surface2);z-index:3">Dipendente</th>';
+  for (const c of data.corsi_richiesti) {
+    html += `<th class="th-corso" title="${c.nome}">${c.nome}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const dip of data.dipendenti) {
+    html += `<tr><td class="td-dip">${dip.cognome} ${dip.nome}<br><span style="font-size:10px;color:var(--text3);font-weight:400">${dip.cantiere_sede}</span></td>`;
+    for (const c of data.corsi_richiesti) {
+      const att = dip.attestati[c.id] || {stato:'assente'};
+      const cls = cellClass[att.stato] || 'cell-assente';
+      const lbl = cellLabel[att.stato] || att.stato;
+      const title = att.data_scadenza
+        ? `Scad: ${fmtDate(att.data_scadenza)}${att.giorni_alla_scadenza!==null?' ('+att.giorni_alla_scadenza+'gg)':''}`
+        : att.stato;
+      html += `<td class="${cls}" title="${title}">${lbl}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  matrix.innerHTML = html;
+}
+
+async function loadCTDipendenti() {
+  const tbody = document.getElementById('ct-dip-table');
+  try {
+    const rows = await api('/cantieri-temp/'+currentCT.id+'/dipendenti');
+    tbody.innerHTML = rows.length ? rows.map(r => `
+      <tr>
+        <td class="td-name">${r.cognome} ${r.nome}</td>
+        <td><span class="cant-badge">${r.cantiere_sede}</span></td>
+        <td style="color:var(--text3)">${r.agenzia||'—'}</td>
+        <td>${r.data_ingresso?fmtDate(r.data_ingresso):'—'}</td>
+        <td style="color:var(--text3);font-size:12px">${r.note||''}</td>
+        <td>
+          <button class="btn btn-danger btn-sm" onclick="rimuoviDipCT(${r.dipendente_id})">✕</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text3)">Nessun dipendente assegnato</td></tr>';
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function rimuoviDipCT(dipId) {
+  if (!confirm('Rimuovere il dipendente dal cantiere?')) return;
+  try {
+    await api(`/cantieri-temp/${currentCT.id}/dipendenti/${dipId}`, {method:'DELETE'});
+    toast('Dipendente rimosso');
+    await loadCTDipendenti();
+    await refreshChecklist();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+function openAddDipToCT() {
+  // Riusa il select dipendenti già caricato
+  document.getElementById('ct-add-dip-sel').innerHTML =
+    '<option value="">Seleziona…</option>' +
+    dipendenti.map(d=>`<option value="${d.id}">${d.cognome} ${d.nome} — ${d.cantiere}</option>`).join('');
+  openModal('modal-ct-dip');
+}
+
+async function saveAddDipToCT() {
+  const id = parseInt(document.getElementById('ct-add-dip-sel').value);
+  const ing = document.getElementById('ct-add-ingresso').value;
+  const note = document.getElementById('ct-add-note').value;
+  if (!id) { toast('Seleziona un dipendente','error'); return; }
+  try {
+    await api(`/cantieri-temp/${currentCT.id}/dipendenti`, {
+      method:'POST',
+      body:JSON.stringify({dipendente_id:id, data_ingresso:ing||null, note:note||null})
+    });
+    closeModal('modal-ct-dip');
+    toast('Dipendente aggiunto');
+    await loadCTDipendenti();
+    await refreshChecklist();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// CRUD cantiere temp
+async function editCT(id) {
+  const ct = await api('/cantieri-temp/'+id);
+  document.getElementById('ct-nome').value = ct.nome;
+  document.getElementById('ct-cliente').value = ct.cliente||'';
+  document.getElementById('ct-dinizio').value = ct.data_inizio||'';
+  document.getElementById('ct-dfine').value = ct.data_fine||'';
+  document.getElementById('ct-desc').value = ct.descrizione||'';
+  document.getElementById('ct-attivo-sel').value = ct.attivo;
+  editingId = id;
+  document.getElementById('ct-modal-title').textContent = 'Modifica cantiere';
+  openModal('modal-ct');
+}
+async function saveCT() {
+  const body = {
+    nome: document.getElementById('ct-nome').value.trim(),
+    cliente: document.getElementById('ct-cliente').value.trim()||null,
+    data_inizio: document.getElementById('ct-dinizio').value||null,
+    data_fine: document.getElementById('ct-dfine').value||null,
+    descrizione: document.getElementById('ct-desc').value.trim()||null,
+    attivo: parseInt(document.getElementById('ct-attivo-sel').value),
+  };
+  if (!body.nome) { toast('Nome obbligatorio','error'); return; }
+  try {
+    if (editingId) await api(`/cantieri-temp/${editingId}`,{method:'PUT',body:JSON.stringify(body)});
+    else await api('/cantieri-temp/',{method:'POST',body:JSON.stringify(body)});
+    closeModal('modal-ct');
+    toast('Cantiere salvato');
+    editingId = null;
+    loadCantierTemp();
+  } catch(e) { toast(e.message,'error'); }
+}
+async function deleteCT(id) {
+  if (!confirm('Eliminare il cantiere temporaneo? Verranno rimosse tutte le assegnazioni.')) return;
+  try {
+    await api('/cantieri-temp/'+id,{method:'DELETE'});
+    toast('Cantiere eliminato');
+    loadCantierTemp();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+init();
+</script>
+</body>
+</html>
