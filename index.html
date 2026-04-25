@@ -477,6 +477,72 @@ tr.row-in-scadenza td{background:rgba(245,158,11,.04)}
 </head>
 <body>
 
+<!-- ── LOGIN SCREEN ──────────────────────────────────────── -->
+<div id="login-screen" style="display:none">
+  <style>
+    #login-screen {
+      position:fixed;inset:0;z-index:9999;
+      background:var(--bg);
+      display:flex;align-items:center;justify-content:center;
+    }
+    .login-box {
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:var(--radius-lg);
+      padding:36px 40px;
+      width:100%;max-width:360px;
+      box-shadow:var(--shadow);
+    }
+    .login-box h2{font-size:18px;font-weight:600;color:var(--text);margin-bottom:4px}
+    .login-box p{font-size:12px;color:var(--text3);margin-bottom:24px}
+    .login-box .form-group{margin-bottom:14px}
+    .login-box .form-group label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px}
+    .login-box .form-group input{
+      width:100%;background:var(--surface2);border:1px solid var(--border);
+      border-radius:8px;padding:9px 12px;color:var(--text);
+      font-family:var(--font);font-size:13px;
+    }
+    .login-box .form-group input:focus{outline:none;border-color:var(--accent)}
+    #login-error{font-size:12px;color:var(--red);margin-bottom:12px;display:none}
+    #login-btn{
+      width:100%;padding:10px;background:var(--accent);color:#fff;
+      border:none;border-radius:8px;font-family:var(--font);
+      font-size:14px;font-weight:500;cursor:pointer;transition:background .15s;
+    }
+    #login-btn:hover{background:#3d7de8}
+    #login-btn:disabled{opacity:.6;cursor:not-allowed}
+    .login-logo{
+      width:40px;height:40px;background:var(--accent);border-radius:10px;
+      display:flex;align-items:center;justify-content:center;margin-bottom:16px;
+    }
+    .login-logo svg{width:22px;height:22px;color:#fff}
+  </style>
+  <div class="login-box">
+    <div class="login-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="11" width="18" height="11" rx="2"/>
+        <path d="M7 11V7a5 5 0 0110 0v4"/>
+      </svg>
+    </div>
+    <h2>Accesso richiesto</h2>
+    <p>Gestione Formazioni e Visite Mediche</p>
+    <div class="form-group">
+      <label>Username</label>
+      <input id="login-user" type="text" placeholder="username"
+             autocomplete="username"
+             onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input id="login-pass" type="password" placeholder="••••••••"
+             autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div id="login-error">Username o password non corretti.</div>
+    <button id="login-btn" onclick="doLogin()">Accedi</button>
+  </div>
+</div>
+
 <div class="app">
 <!-- ── SIDEBAR ──────────────────────────────────────────────── -->
 <aside class="sidebar" id="sidebar">
@@ -2251,7 +2317,7 @@ async function deleteCT(id) {
   } catch(e) { toast(e.message,'error'); }
 }
 
-init();
+document.addEventListener("DOMContentLoaded", init);
 </script>
 </body>
 </html>
